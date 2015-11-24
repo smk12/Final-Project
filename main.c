@@ -8,21 +8,41 @@
 
 #include <xc.h>
 #include <sys/attribs.h>
-//#include "lcd.h"
 #include "timer.h"
 #include "adc.h"
 #include "pwm.h"
 #include "config.h"
+#include "switch.h"
 #include "interrupt.h"
 #include "math.h"
 
-#define  adcBuffer ADC1BUF0
+#define Rthresh 60
+#define Cthresh 115
+#define Lthresh 200
+#define MAX 225
+#define MIN 0
 
-#define FORWARD     1
-#define BACKWARD    0
-#define THRESHOLD   512
+#define  rightBuff ADC1BUF0
+#define  centerBuff ADC1BUF1
+#define  leftBuff ADC1BUF2
 
-int direction = FORWARD;
+#define rightMotor OC1RS
+#define leftMotor OC3RS
+
+#define PRESS 0
+#define SWITCH PORTDbits.RD6
+
+
+
+typedef enum {
+    wait, forward, Lturn, Rturn, logic, Aturn
+} stateType;
+
+volatile stateType currState = wait;
+volatile stateType lastState = forward;
+volatile int temp;
+volatile int x, y, z;
+volatile int dt=5;
 
 int main(void)
 {
@@ -34,44 +54,68 @@ int main(void)
     
     while(1)
     {
-        
-        if(IFS0bits.AD1IF==1){  
-         IFS0bits.AD1IF = 0;
-         
-         if((adcBuffer>=480)&(adcBuffer<=544))
-         {
-             OC1RS = 1023;
-             OC3RS = 1023;
-         }
-         else if(adcBuffer>544)
-         {
-             OC1RS = 1023;
-             if(adcBuffer > 980)
-                 OC3RS = 0;
-             else
-                OC3RS = 1023-(int)(adcBuffer/2);
-             
-         }
-         else 
-         {
-             OC3RS = 1023;
-             OC1RS = adcBuffer * 2;
-         }
-         /*
-         if(adcBuffer < 512){
-                OC1RS = (THRESHOLD-adcBuffer)*2; 
-                OC3RS = (THRESHOLD-adcBuffer)*2;
-                direction= BACKWARD;
-                flipFlop(direction);
-            }
-            else{
-                OC1RS = (adcBuffer-THRESHOLD)*2; 
-                OC3RS = (adcBuffer-THRESHOLD)*2;
-                direction= FORWARD;
-                flipFlop(direction);
-            }
-         */
-        }    
+        switch(currState)
+        {
+                case wait:
+                    leftMotor = MIN; rightMotor = MIN;
+                    if(SWITCH == PRESS)
+                        currState = forward;
+                    break;
+                case forward:
+                    lastState = currState;
+                    leftMotor = MAX; rightMotor = MAX;    //Real Code
+                    //leftMotor = MIN; rightMotor = MIN;      //Test Code
+                    currState = logic;
+                    delayMs(dt);
+                    break;
+                case Lturn:
+                    lastState = currState;
+                    leftMotor = MIN; rightMotor = MAX;
+                    /*
+                    for(temp=0;leftBuff < Lthresh;temp++)
+                    {
+                        leftMotor = MIN; rightMotor = MAX;  //Real code
+                        //leftMotor = MIN; rightMotor = MIN;         //Test Code
+                        IFS0bits.AD1IF = 0;
+                    }
+                    */
+                    delayMs(dt);
+                    currState = logic;
+                    break;
+                case Rturn:
+                    lastState = currState;
+                    rightMotor = MIN; leftMotor = MAX;
+                    /*
+                    for(temp=0;rightBuff < Rthresh;temp++)
+                    {
+                        rightMotor = MIN; leftMotor = MAX;
+                        //leftMotor = MIN; rightMotor = MIN;      //Test Code
+                        IFS0bits.AD1IF = 0;
+                    }
+                    */
+                    currState = logic;
+                    delayMs(dt);
+                    break;
+                case Aturn:
+                    lastState = currState;
+                    currState = Lturn;
+                    break;
+                case logic:
+                    while(IFS0bits.AD1IF!=1){}
+                    IFS0bits.AD1IF = 0;
+                    if((leftBuff > Lthresh)&&(rightBuff > Rthresh))
+                        currState = forward;
+                    else if((leftBuff < Lthresh)&&(rightBuff < Rthresh))
+                        currState = Aturn;
+                    else if(leftBuff < Lthresh)
+                        currState = Lturn;
+                    else if(rightBuff < Rthresh)
+                        currState = Rturn;
+                    else
+                        currState = forward;
+                    break;
+                
+        }
     }
     return 0;   
 }
