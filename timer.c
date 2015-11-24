@@ -39,7 +39,7 @@ void delayUs(unsigned int delay)
 void delayMs(unsigned int delay){
     //TODO: Create a delay using timer 2 for "delay" microseconds.
     TMR2 = 0;
-    PR2 = delay*39;
+    PR2 = delay*42;         //39
     T2CONbits.TCKPS = 7;//pre-scalar
     T2CONbits.TCS = 0;//osc config
     IFS0bits.T2IF = 0;//flag
@@ -49,3 +49,4 @@ void delayMs(unsigned int delay){
     IFS0bits.T2IF = 0;
 
 }
+
