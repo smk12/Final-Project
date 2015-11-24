@@ -19,7 +19,7 @@
 #define Rthresh 60
 #define Cthresh 115
 #define Lthresh 200
-#define MAX 225
+#define MAX 250
 #define MIN 0
 
 #define  rightBuff ADC1BUF0
@@ -42,7 +42,7 @@ volatile stateType currState = wait;
 volatile stateType lastState = forward;
 volatile int temp;
 volatile int x, y, z;
-volatile int dt=5;
+volatile int dt=6;
 
 int main(void)
 {
@@ -98,24 +98,30 @@ int main(void)
                     break;
                 case Aturn:
                     lastState = currState;
-                    currState = Lturn;
+                    leftMotor = MIN; rightMotor = 1000;
+                    currState = logic;
+                    delayMs(dt);
                     break;
                 case logic:
                     while(IFS0bits.AD1IF!=1){}
                     IFS0bits.AD1IF = 0;
                     if((leftBuff > Lthresh)&&(rightBuff > Rthresh))
                         currState = forward;
-                    else if((leftBuff < Lthresh)&&(rightBuff < Rthresh))
+                    else if((leftBuff < Lthresh)&&(rightBuff < Rthresh)&&(centerBuff < Cthresh))
                         currState = Aturn;
+                    else if((leftBuff < Lthresh)&&(rightBuff < Rthresh))
+                        currState = Lturn;
                     else if(leftBuff < Lthresh)
                         currState = Lturn;
                     else if(rightBuff < Rthresh)
                         currState = Rturn;
                     else
                         currState = forward;
+
                     break;
                 
         }
     }
     return 0;   
 }
+
